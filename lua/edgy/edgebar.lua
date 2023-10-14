@@ -38,7 +38,7 @@ function M.size(size, max)
   if type(size) == "function" then
     size = size()
   end
-  return math.max(size < 1 and math.floor(max * size) or size, 1)
+  return math.max(size < 1 and math.floor(max * size) or size, 0)
 end
 
 ---@param pos Edgy.Pos
@@ -118,8 +118,47 @@ function M:on_hide(win)
     return self:close()
   end
 
-  if visible == 0 and require("edgy.config").close_when_all_hidden then
-    return self:close()
+  -- if visible == 0 and require("edgy.config").close_when_all_hidden then
+  --   return self:close()
+  -- else
+  if visible == 0 then
+    local curwin = vim.api.nvim_get_current_win()
+    local tmp_win = vim.api.nvim_win_call(real[1].win, function()
+      if self.vertical then
+        vim.cmd.split()
+      else
+        vim.cmd.vsplit()
+      end
+      local win = vim.api.nvim_get_current_win()
+      local buf = vim.api.nvim_create_buf(false, true)
+      vim.bo[buf].ft = "EdgyTemporary"
+      vim.api.nvim_win_set_buf(win, buf)
+      return win
+    end)
+    vim.api.nvim_set_current_win(curwin)
+
+    local view = require("edgy.view").new({
+      ft = "EdgyTemporary", --
+      wo = {
+        winbar = false,
+        number = false,
+        relativenumber = false,
+        signcolumn = "no",
+        numberwidth = 1,
+      },
+      size = {
+        width = 0,
+        height = 0,
+      },
+    }, self)
+    table.insert(self.views, view)
+    local w = require("edgy.window").new(
+      tmp_win,
+      view --[[@as Edgy.View]] --
+    )
+    table.insert(self.wins, w)
+    w:show()
+    return
   end
 
   table.sort(real, function(a, b)
